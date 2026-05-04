@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import bit_timer
 
@@ -128,5 +129,49 @@ struct ParseDurationTests {
 
     @Test func invalidNegativeSeconds() {
         #expect("5:-1".parseDurationToSeconds() == nil)
+    }
+}
+
+// MARK: - Bit Timings
+
+@Suite("BitTimings")
+struct BitTimingsTests {
+
+    @Test func lastRunBitDurationsCountMatchesBitCount() {
+        let content = "- Bit one\n- Bit two\n- Bit three"
+        let set = ComedySet(id: UUID(), name: "Test", durationSeconds: 600,
+                            markdownContent: content,
+                            lastRunBitDurations: [10, 20, 30])
+        #expect(set.lastRunBitDurations?.count == set.bits.count)
+    }
+
+    @Test func updateClearsDurationsWhenBitCountChanges() {
+        let store = SetStore()
+        let id = UUID()
+        let original = ComedySet(id: id, name: "Test", durationSeconds: 300,
+                                 markdownContent: "- Bit one\n- Bit two",
+                                 lastRunBitDurations: [10.0, 20.0])
+        store.sets = [original]
+
+        var edited = original
+        edited.markdownContent = "- Bit one\n- Bit two\n- Bit three"
+        store.update(edited)
+
+        #expect(store.sets.first?.lastRunBitDurations == nil)
+    }
+
+    @Test func updatePreservesDurationsWhenBitCountUnchanged() {
+        let store = SetStore()
+        let id = UUID()
+        let original = ComedySet(id: id, name: "Test", durationSeconds: 300,
+                                 markdownContent: "- Bit one\n- Bit two",
+                                 lastRunBitDurations: [10.0, 20.0])
+        store.sets = [original]
+
+        var edited = original
+        edited.name = "Updated Name"
+        store.update(edited)
+
+        #expect(store.sets.first?.lastRunBitDurations == [10.0, 20.0])
     }
 }

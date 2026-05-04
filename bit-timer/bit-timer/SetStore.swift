@@ -17,7 +17,11 @@ final class SetStore {
 
     func update(_ set: ComedySet) {
         guard let i = sets.firstIndex(where: { $0.id == set.id }) else { return }
-        sets[i] = set
+        var updated = set
+        if set.bits.count != sets[i].bits.count {
+            updated.lastRunBitDurations = nil
+        }
+        sets[i] = updated
         save()
     }
 

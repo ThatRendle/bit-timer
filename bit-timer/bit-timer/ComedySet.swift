@@ -5,9 +5,17 @@ struct ComedySet: Codable, Identifiable, Hashable {
     var name: String
     var durationSeconds: Int
     var markdownContent: String
+    var lastRunBitDurations: [TimeInterval]?
 
     var bits: [String] {
         markdownContent.parseBulletLines()
+    }
+}
+
+extension TimeInterval {
+    var formattedDwell: String {
+        let total = Int(self)
+        return String(format: "%d:%02d", total / 60, total % 60)
     }
 }
 

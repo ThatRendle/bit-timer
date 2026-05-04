@@ -4,14 +4,19 @@ import Combine
 struct PerformanceView: View {
     let set: ComedySet
 
+    @Environment(SetStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
     @State private var startDate: Date = .now
     @State private var elapsed: TimeInterval = 0
     @State private var currentIndex: Int = 0
     @State private var showingExitAlert = false
+    @State private var dwellTimes: [TimeInterval] = []
+    @State private var lastIndexChangeDate: Date = .now
 
     private let timerPublisher = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    private var isFin: Bool { currentIndex == set.bits.count }
 
     private var remaining: TimeInterval {
         TimeInterval(set.durationSeconds) - elapsed
@@ -24,31 +29,25 @@ struct PerformanceView: View {
             Color.black.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Top: countdown timer
                 timerDisplay
                     .frame(maxWidth: .infinity)
                     .padding(.top, 32)
                     .padding(.bottom, 16)
 
-                // Middle: segmented progress bar
                 progressBar
                     .padding(.horizontal, 20)
                     .padding(.bottom, 16)
 
-                // Bottom: bit prompt (tappable to advance)
                 ZStack(alignment: .bottomLeading) {
-                    bitPrompt
+                    promptArea
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if currentIndex < set.bits.count - 1 {
-                                currentIndex += 1
-                            }
+                            if !isFin { advance(to: currentIndex + 1) }
                         }
 
-                    // Back button — bottom-left, disabled on first bit
                     Button {
-                        if currentIndex > 0 { currentIndex -= 1 }
+                        if currentIndex > 0 { advance(to: currentIndex - 1) }
                     } label: {
                         Image(systemName: "chevron.left")
                             .font(.title2.bold())
@@ -64,10 +63,10 @@ struct PerformanceView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button("End") {
-                    if remaining > 0 {
+                    if remaining > 0 && !isFin {
                         showingExitAlert = true
                     } else {
-                        dismiss()
+                        saveAndDismiss()
                     }
                 }
                 .foregroundStyle(.white)
@@ -76,7 +75,7 @@ struct PerformanceView: View {
         .toolbarBackground(.black, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .alert("End Set?", isPresented: $showingExitAlert) {
-            Button("End Set", role: .destructive) { dismiss() }
+            Button("End Set", role: .destructive) { saveAndDismiss() }
             Button("Continue", role: .cancel) { }
         } message: {
             Text("You still have time remaining. End the set early?")
@@ -84,12 +83,15 @@ struct PerformanceView: View {
         .onAppear {
             startDate = .now
             elapsed = 0
+            dwellTimes = Array(repeating: 0, count: set.bits.count)
+            lastIndexChangeDate = .now
             UIApplication.shared.isIdleTimerDisabled = true
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
         }
         .onReceive(timerPublisher) { _ in
+            guard !isFin else { return }
             elapsed = Date.now.timeIntervalSince(startDate)
         }
         .preferredColorScheme(.dark)
@@ -119,9 +121,13 @@ struct PerformanceView: View {
         return .white.opacity(0.15)
     }
 
-    private var bitPrompt: some View {
+    private var promptArea: some View {
         VStack {
-            if !set.bits.isEmpty {
+            if isFin {
+                Text("FIN")
+                    .font(.system(size: 80, weight: .thin, design: .monospaced))
+                    .foregroundStyle(.white)
+            } else if !set.bits.isEmpty {
                 Text(set.bits[currentIndex])
                     .font(.system(size: 48, weight: .bold))
                     .foregroundStyle(.white)
@@ -130,6 +136,29 @@ struct PerformanceView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // Accumulates dwell on the outgoing index, resets the clock, moves to newIndex.
+    private func advance(to newIndex: Int) {
+        let now = Date.now
+        if currentIndex < set.bits.count {
+            dwellTimes[currentIndex] += now.timeIntervalSince(lastIndexChangeDate)
+        }
+        lastIndexChangeDate = now
+        currentIndex = newIndex
+    }
+
+    private func flushCurrentDwell() {
+        guard currentIndex < set.bits.count else { return }
+        dwellTimes[currentIndex] += Date.now.timeIntervalSince(lastIndexChangeDate)
+    }
+
+    private func saveAndDismiss() {
+        flushCurrentDwell()
+        var updated = set
+        updated.lastRunBitDurations = dwellTimes
+        store.update(updated)
+        dismiss()
     }
 
     private func formatTime(_ interval: TimeInterval) -> String {
