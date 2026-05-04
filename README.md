@@ -5,6 +5,8 @@ A native iPhone app for stand-up comedians to run a set.
 - **Countdown timer** for the full set, turning red and counting up when overtime
 - **Bit prompts** displayed one at a time, advanced by tap with a back button for mis-taps
 - **Segmented progress bar** showing position within the set
+- **FIN page** at the end of the set — freezes the timer and signals a clean finish
+- **Per-bit timing** — records how long you actually spent on each bit and shows it in the set preview after the run
 - **Multiple named sets** stored on-device, created by pasting a markdown bullet list
 - Screen stays awake during performance
 
